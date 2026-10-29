@@ -1,0 +1,55 @@
+[1/40] 68111: trigger 67804 delta=+0.0369 confirmed=False
+[2/40] 68163: trigger 67941 delta=-0.3052 confirmed=True
+[3/40] 68923: trigger 68838 delta=-0.1624 confirmed=True
+[4/40] 69010: trigger 68683 delta=-0.1242 confirmed=True
+[5/40] 69100: trigger 68920 delta=-0.0515 confirmed=True
+[6/40] 70211: trigger 70176 delta=+0.0048 confirmed=False
+[7/40] 70243: trigger 70156 delta=-0.0019 confirmed=True
+[8/40] 70263: trigger 70144 delta=+0.0000 confirmed=False
+[9/40] 70440: trigger 70384 delta=-0.0434 confirmed=True
+[10/40] 70800: trigger 70648 delta=-0.0000 confirmed=False
+[11/40] 70837: trigger 70671 delta=+0.0000 confirmed=False
+[12/40] 70857: trigger 70605 delta=+0.0200 confirmed=False
+[13/40] 70946: trigger 70713 delta=-0.0540 confirmed=True
+[14/40] 70986: trigger 70718 delta=+0.0137 confirmed=False
+[15/40] 71877: trigger 71745 delta=+0.0000 confirmed=False
+[16/40] 71913: trigger 71754 delta=+0.0000 confirmed=False
+[17/40] 71961: trigger 71730 delta=+0.0380 confirmed=False
+[18/40] 72069: trigger 71964 delta=-0.0352 confirmed=True
+[19/40] 73210: trigger 73048 delta=+0.0032 confirmed=False
+[20/40] 73238: trigger 72961 delta=-0.0115 confirmed=True
+[21/40] 73313: trigger 73195 delta=+0.0499 confirmed=False
+[22/40] 73547: trigger 73247 delta=+0.0836 confirmed=False
+[23/40] 74049: trigger 74018 delta=-0.1353 confirmed=True
+[24/40] 74316: trigger 74172 delta=-0.3570 confirmed=True
+[25/40] 74521: trigger 74237 delta=-0.1620 confirmed=True
+[26/40] 74558: trigger 74403 delta=+0.0015 confirmed=False
+[27/40] 75439: trigger 75217 delta=-0.0253 confirmed=True
+[28/40] 75725: trigger 75492 delta=-0.0402 confirmed=True
+[29/40] 75868: trigger 75844 delta=+0.0017 confirmed=False
+[30/40] 75955: trigger 75863 delta=+0.0000 confirmed=False
+[31/40] 76061: trigger 76004 delta=+0.0064 confirmed=False
+[32/40] 76087: trigger 76011 delta=-0.0561 confirmed=True
+[33/40] 76758: trigger 76708 delta=-0.2960 confirmed=True
+[34/40] 76761: trigger 76550 delta=-0.1343 confirmed=True
+[35/40] 76973: trigger 76867 delta=+0.0014 confirmed=False
+[36/40] 77005: trigger 76854 delta=+0.0000 confirmed=False
+[37/40] 77413: trigger 77193 delta=-0.4241 confirmed=True
+[38/40] 77621: trigger 77453 delta=-0.0000 confirmed=False
+[39/40] 77664: trigger 77499 delta=-0.0000 confirmed=False
+[40/40] 77862: trigger 77776 delta=+0.0000 confirmed=False
+{
+  "tau": 0.001,
+  "n_planted_total": 661,
+  "n_planted_in_test": 105,
+  "n_eligible_evaluated": 40,
+  "n_confirmed": 18,
+  "frac_confirmed": 0.45,
+  "bf_hit@1": 0.4444444444444444,
+  "bf_hit@3": 0.7777777777777778,
+  "recency_hit@1": 0.3888888888888889,
+  "recency_hit@3": 0.8888888888888888,
+  "greedy_hit@1": 0.4444444444444444,
+  "greedy_hit@3": 0.7777777777777778,
+  "greedy_set_contains_trigger": 0.5555555555555556
+}

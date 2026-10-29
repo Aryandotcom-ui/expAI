@@ -1,0 +1,15 @@
+{
+  "tau": 0.001,
+  "n_planted_total": 661,
+  "n_planted_in_test": 105,
+  "n_eligible_evaluated": 40,
+  "n_confirmed": 18,
+  "frac_confirmed": 0.45,
+  "bf_hit@1": 0.4444444444444444,
+  "bf_hit@3": 0.7777777777777778,
+  "recency_hit@1": 0.3888888888888889,
+  "recency_hit@3": 0.8888888888888888,
+  "greedy_hit@1": 0.4444444444444444,
+  "greedy_hit@3": 0.7777777777777778,
+  "greedy_set_contains_trigger": 0.5555555555555556
+}

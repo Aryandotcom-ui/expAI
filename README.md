@@ -114,7 +114,27 @@ CoDy depend on replays cached in the same process, so compare them by model eval
   - The greedy set of up to 5 events lowers the score by a median 0.17 (IQR 0.045–0.47).
   - That is a median 2.9× the largest single effect (`set_vs_single` in `summary.json`).
 
-PLANTED_PLACEHOLDER
+**Planted triggers** (Stage 7, optional; `synthetic/evaluate_planted.py`).
+- The generator plants 661 trigger → consequence pairs: a user who edits page *a* edits page *b*
+  10 min–3 h later with probability 0.8. 105 of them fall in the test region.
+- We took the first 40 consequences with baseline ≥ 0.5 whose trigger is a candidate, and first
+  checked with brute force whether the model is actually sensitive to the trigger.
+- **Only 18 of 40 (45%) were confirmed** (removing the trigger lowers the score by ≥ τ).
+  - In 14 cases removing the trigger *raised* the score.
+  - In 10 cases it had no effect.
+  - The trained TGN has not reliably learned the planted rule.
+- On the 18 confirmed cases, the trigger's rank was:
+
+  | Explainer | hit@1 | hit@3 |
+  |---|---|---|
+  | brute force | 0.44 | 0.78 |
+  | recency | 0.39 | 0.89 |
+  | greedy | 0.44 | 0.78 |
+
+  The trigger was in greedy's counterfactual set in 56% of cases.
+- Triggers are recent by construction, which favors recency. Scoring explainers against
+  planted ground truth without the brute-force check would have graded them against a rule
+  the model does not use.
 
 ## Layout
 
