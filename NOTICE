@@ -1,0 +1,7 @@
+This repository contains code from:
+
+- twitter-research/tgn (https://github.com/twitter-research/tgn), Apache License 2.0, see
+  LICENSE-TGN. Files: train_self_supervised.py, train_supervised.py, evaluation/, model/,
+  modules/, utils/. Modification: utils/data_processing.py (random.sample on a set, Python 3.11+).
+- daniel-gomm/CoDy (https://github.com/daniel-gomm/CoDy), MIT License, see third_party/cody/.
+- Cytoscape.js (MIT) and Chart.js (MIT), vendored in tgn_trace/ui/vendor/.

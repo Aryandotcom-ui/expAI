@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TGN-Trace</title>
+<script src="vendor/chart.umd.js"></script>
+<script src="vendor/cytoscape.min.js"></script>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --ink: #1c2330; --muted: #5d6778; --line: #dde1e8;
+  --accent: #2f6fdb; --accent-soft: #e6eefc; --warn: #b4540a; --warn-soft: #fdf0e3;
+  --ok: #1d7a4b; --ok-soft: #e3f4ea; --bad: #b42335; --bad-soft: #fbe7ea;
+  --cf: #7a3fbf; --cf-soft: #f2eafb; --removed: #9aa3b2;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12151b; --panel: #1a1f27; --ink: #e5e9f0; --muted: #9aa4b5; --line: #2c3340;
+    --accent: #6c9ef0; --accent-soft: #1f2b40; --warn: #f0a35c; --warn-soft: #3a2a1a;
+    --ok: #5cc78f; --ok-soft: #173326; --bad: #f07a8a; --bad-soft: #3a1c22;
+    --cf: #b48af0; --cf-soft: #2a1f3a; --removed: #5d6676;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--ink); }
+header { background: var(--panel); border-bottom: 1px solid var(--line); padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; }
+header h1 { font-size: 17px; margin: 0; letter-spacing: .2px; }
+.banner { width: 100%; background: var(--warn-soft); color: var(--warn); border-radius: 6px; padding: 5px 10px; font-size: 12.5px; }
+.kv { display: flex; flex-direction: column; font-size: 12px; color: var(--muted); }
+.kv b { color: var(--ink); font-size: 14px; font-weight: 600; font-family: var(--mono); }
+select, button { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 5px 9px; }
+button { cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button:disabled { opacity: .5; cursor: default; }
+main { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, .95fr); gap: 12px; padding: 12px 16px; }
+@media (max-width: 1100px) { main { grid-template-columns: 1fr; } }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; min-width: 0; }
+section h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin: 0 0 8px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+#timelineWrap { height: 170px; }
+#graph { height: 340px; border: 1px solid var(--line); border-radius: 8px; }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { color: var(--muted); font-weight: 600; position: sticky; top: 0; background: var(--panel); }
+td.num, th.num { text-align: right; font-family: var(--mono); }
+tr.sel td { background: var(--accent-soft); }
+tr.removed td { color: var(--removed); text-decoration: line-through; }
+tr { cursor: pointer; }
+.tablewrap { max-height: 330px; overflow: auto; }
+.neg { color: var(--bad); } .pos { color: var(--ok); }
+.flag { display: inline-block; border-radius: 999px; padding: 1px 9px; font-size: 12px; font-weight: 600; }
+.flag.CONSISTENT { background: var(--ok-soft); color: var(--ok); }
+.flag.DISAGREEMENT { background: var(--bad-soft); color: var(--bad); }
+.flag.INSUFFICIENT { background: var(--warn-soft); color: var(--warn); }
+.grid2 { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: 13px; }
+.grid2 span:nth-child(odd) { color: var(--muted); }
+.grid2 span:nth-child(even) { font-family: var(--mono); }
+.note { font-size: 12px; color: var(--muted); }
+.err { color: var(--bad); font-size: 12.5px; }
+.cf { border: 2px dashed var(--cf); background: repeating-linear-gradient(135deg, var(--cf-soft), var(--cf-soft) 8px, transparent 8px, transparent 16px); border-radius: 8px; padding: 10px; }
+.cf .tag { color: var(--cf); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+.bars { display: grid; grid-template-columns: 110px 1fr 64px; gap: 6px 8px; align-items: center; margin: 8px 0; font-size: 12.5px; }
+.bar { height: 14px; background: var(--line); border-radius: 4px; position: relative; overflow: hidden; }
+.bar i { position: absolute; inset: 0 auto 0 0; background: var(--accent); }
+.bar.cfbar i { background: var(--cf); }
+.bar::after { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; border-left: 2px solid var(--ink); opacity: .45; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: -2px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.legend { display: flex; gap: 12px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+.legend i { display: inline-block; width: 18px; height: 0; border-top: 3px solid; vertical-align: middle; margin-right: 4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>TGN-Trace</h1>
+  <label class="kv">Target <select id="targetSel" aria-label="target"></select></label>
+  <div class="kv">u → v <b id="hUV">–</b></div>
+  <div class="kv">t <b id="hT">–</b></div>
+  <div class="kv">baseline score <b id="hBase">–</b></div>
+  <div class="kv">explainer
+    <select id="explSel" aria-label="explainer">
+      <option value="recency">recency</option>
+      <option value="greedy">greedy counterfactual</option>
+      <option value="bruteforce">brute force (ground truth)</option>
+      <option value="cody">CoDy (exact replay)</option>
+    </select>
+  </div>
+  <div class="kv" style="margin-left:auto">model / data <b id="hModel" style="font-size:12px">–</b></div>
+  <div class="banner">Research prototype, not for operational decisions. Intervention effects measure the model's sensitivity, not real-world causation.</div>
+</header>
+<main>
+  <div class="col">
+    <section>
+      <h2>Event timeline <span class="note" id="tlNote"></span></h2>
+      <div id="timelineWrap"><canvas id="timeline"></canvas></div>
+    </section>
+    <section>
+      <h2>Candidate events <span class="note" id="candNote"></span></h2>
+      <div class="tablewrap"><table id="candTable"><thead><tr>
+        <th>rank</th><th>edge</th><th>touches</th><th class="num">t</th><th class="num">batches back</th><th class="num">replay Δ (B)</th>
+      </tr></thead><tbody></tbody></table></div>
+      <div id="explStatus" class="note" style="margin-top:6px"></div>
+    </section>
+  </div>
+  <div class="col">
+    <section>
+      <h2>Subgraph</h2>
+      <div id="graph"></div>
+      <div class="legend" style="margin-top:6px">
+        <span><i style="border-color:var(--accent)"></i>candidate event</span>
+        <span><i style="border-color:var(--ink)"></i>target (u → v)</span>
+        <span><i style="border-color:var(--removed);border-top-style:dashed"></i>removed</span>
+      </div>
+    </section>
+    <section>
+      <h2>Counterfactual replay</h2>
+      <div class="row">
+        <button id="btnToggle" disabled>Remove selected</button>
+        <button id="btnReplay" class="primary" disabled>Replay</button>
+        <button id="btnRestore" disabled>Restore</button>
+        <span class="note" id="removedNote">0 removed</span>
+      </div>
+      <div id="cfOut" style="margin-top:10px"><div class="note">Select candidate events, remove them, then replay. Replay recomputes memory and the temporal neighborhood from the latest state checkpoint.</div></div>
+    </section>
+  </div>
+  <div class="col">
+    <section>
+      <h2>Evidence <span id="flagBadge"></span></h2>
+      <div id="flagReason" class="note" style="margin-bottom:8px"></div>
+      <div id="evidence" class="note">Select a candidate event.</div>
+    </section>
+    <section>
+      <h2>Agreement</h2>
+      <div id="agreement" class="note">–</div>
+    </section>
+  </div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const S = { targets: [], trace: null, ver: null, expl: null, selected: null, removed: new Set(), cy: null, chart: null };
+const fmt = (x, d = 4) => (x === null || x === undefined || Number.isNaN(x)) ? '–' : Number(x).toFixed(d);
+const sgn = (x, d = 4) => (x === null || x === undefined) ? '–' : (x > 0 ? '+' : '') + Number(x).toFixed(d);
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+async function api(path, body) {
+  const r = await fetch(path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {});
+  if (!r.ok) { let msg = r.statusText; try { msg = (await r.json()).detail || msg; } catch (e) {} throw new Error(`${r.status}: ${msg}`); }
+  return r.json();
+}
+
+async function init() {
+  try {
+    const h = await api('/health');
+    $('hModel').textContent = `${h.model_file.split(/[\\/]/).pop()} · ${h.data} · ${h.device} · ckpt every ${h.checkpoint_every} batches`;
+    S.targets = await api('/api/targets');
+    $('targetSel').innerHTML = S.targets.map(t => `<option value="${t.id}">#${t.id} · ${t.u}→${t.v} · ${t.baseline_score.toFixed(3)}${t.has_verification ? ' ✓' : ''}</option>`).join('');
+    $('targetSel').onchange = () => loadTarget(+$('targetSel').value);
+    $('explSel').onchange = () => loadExplainer();
+    $('btnToggle').onclick = toggleRemove;
+    $('btnReplay').onclick = replay;
+    $('btnRestore').onclick = restore;
+    if (S.targets.length) loadTarget(S.targets[0].id);
+  } catch (e) { $('evidence').innerHTML = `<span class="err">Could not reach the API: ${e.message}</span>`; }
+}
+
+async function loadTarget(id) {
+  S.selected = null; S.removed = new Set(); S.ver = null; S.expl = null;
+  $('cfOut').innerHTML = '<div class="note">Select candidate events, remove them, then replay.</div>';
+  $('candNote').innerHTML = '<span class="spinner"></span> loading trace (brute-force deltas may be computed now)';
+  $('evidence').textContent = 'Select a candidate event.'; $('flagBadge').innerHTML = ''; $('flagReason').textContent = '';
+  try {
+    S.trace = await api(`/api/targets/${id}/trace`);
+    const t = S.trace.target;
+    $('hUV').textContent = `${t.u} → ${t.v}`; $('hT').textContent = t.t.toFixed(1);
+    $('hBase').textContent = `${t.baseline_score.toFixed(4)} (${S.trace.baseline_class ? 'link' : 'no link'})`;
+    $('candNote').textContent = `last ${S.trace.k} events of u or v before t`;
+    renderGraph(); updateButtons();
+    await loadExplainer();
+    $('agreement').innerHTML = '<span class="spinner"></span> loading verification…';
+    S.ver = await api(`/api/targets/${id}/verification`);
+    renderAll();
+  } catch (e) { $('candNote').innerHTML = `<span class="err">${e.message}</span>`; $('agreement').innerHTML = `<span class="err">${e.message}</span>`; }
+}
+
+async function loadExplainer() {
+  const m = $('explSel').value;
+  $('explStatus').innerHTML = `<span class="spinner"></span> running ${m}…`;
+  try {
+    S.expl = await api('/api/explain', { target_id: S.trace.target.id, method: m });
+    let s = `${m}: status <b>${S.expl.status}</b>, ${S.expl.n_model_evals} model evaluations, ${S.expl.runtime_ms.toFixed(0)} ms`;
+    if (S.expl.extra.cf_set) s += ` · counterfactual set [${S.expl.extra.cf_set.join(', ')}]` + (S.expl.extra.final_score != null ? ` → score ${fmt(S.expl.extra.final_score)}` : '');
+    $('explStatus').innerHTML = s;
+  } catch (e) { S.expl = null; $('explStatus').innerHTML = `<span class="err">${m}: ${e.message}</span>`; }
+  renderAll();
+}
+
+function rankOf(e) { return S.expl ? S.expl.ranked.indexOf(e.edge_idx) + 1 : e.ranks.recency; }
+
+function renderAll() { renderTable(); renderTimeline(); renderEvidence(); renderAgreement(); styleGraph(); }
+
+function renderTable() {
+  if (!S.trace) return;
+  const rows = [...S.trace.events].sort((a, b) => rankOf(a) - rankOf(b));
+  $('candTable').querySelector('tbody').innerHTML = rows.map(e => {
+    const d = e.bruteforce_delta;
+    return `<tr data-e="${e.edge_idx}" class="${S.selected === e.edge_idx ? 'sel' : ''} ${S.removed.has(e.edge_idx) ? 'removed' : ''}">
+      <td>${rankOf(e) || '–'}</td><td>${e.edge_idx}</td><td>${e.touches} (${e.u}–${e.v})</td><td class="num">${e.t.toFixed(1)}</td>
+      <td class="num">${e.batch_distance}</td><td class="num ${d < 0 ? 'neg' : d > 0 ? 'pos' : ''}">${sgn(d)}</td></tr>`;
+  }).join('');
+  $('candTable').querySelectorAll('tbody tr').forEach(tr => tr.onclick = () => select(+tr.dataset.e));
+}
+
+function renderTimeline() {
+  if (!S.trace) return;
+  const n = S.trace.events.length;
+  const color = (r) => { const a = 1 - (r - 1) / Math.max(1, n); return `rgba(47,111,219,${0.15 + 0.85 * a})`; };
+  const lane = { u: 2, both: 1, v: 0 };
+  const pts = S.trace.events.map(e => ({ x: e.t, y: lane[e.touches], e }));
+  const ds = [{ data: pts, pointRadius: pts.map(p => S.selected === p.e.edge_idx ? 9 : 6),
+    pointBackgroundColor: pts.map(p => S.removed.has(p.e.edge_idx) ? css('--removed') : color(rankOf(p.e))),
+    pointBorderColor: pts.map(p => S.selected === p.e.edge_idx ? css('--ink') : 'transparent'), pointBorderWidth: 2 },
+    { data: [{ x: S.trace.target.t, y: 1 }], pointStyle: 'star', pointRadius: 10, borderColor: css('--ink'), backgroundColor: css('--ink') }];
+  if (S.chart) S.chart.destroy();
+  S.chart = new Chart($('timeline'), { type: 'scatter', data: { datasets: ds }, options: {
+    animation: false, maintainAspectRatio: false, plugins: { legend: { display: false },
+      tooltip: { callbacks: { label: (c) => c.raw.e ? `edge ${c.raw.e.edge_idx} · rank ${rankOf(c.raw.e)} · Δ ${sgn(c.raw.e.bruteforce_delta)}` : 'target' } } },
+    scales: { y: { min: -0.5, max: 2.5, ticks: { stepSize: 1, color: css('--muted'), callback: (v) => ['v', 'u & v', 'u'][v] }, grid: { color: css('--line') } },
+      x: { title: { display: true, text: 'time (darker = higher explainer rank; ★ = target)', color: css('--muted') }, ticks: { color: css('--muted') }, grid: { color: css('--line') } } },
+    onClick: (evt, els) => { const el = els.find(x => x.datasetIndex === 0); if (el) select(pts[el.index].e.edge_idx); } } });
+  $('tlNote').textContent = `${$('explSel').value} ranking`;
+}
+
+function renderGraph() {
+  const t = S.trace.target, els = [], nodes = new Set([t.u, t.v]);
+  S.trace.events.forEach(e => { nodes.add(e.u); nodes.add(e.v); });
+  nodes.forEach(n => els.push({ data: { id: 'n' + n, label: n === t.u ? `u=${n}` : n === t.v ? `v=${n}` : String(n), role: n === t.u ? 'u' : n === t.v ? 'v' : 'o' } }));
+  S.trace.events.forEach(e => els.push({ data: { id: 'e' + e.edge_idx, source: 'n' + e.u, target: 'n' + e.v, eid: e.edge_idx } }));
+  els.push({ data: { id: 'target', source: 'n' + t.u, target: 'n' + t.v, kind: 'target' } });
+  if (S.cy) S.cy.destroy();
+  S.cy = cytoscape({ container: $('graph'), elements: els, layout: { name: 'concentric', concentric: n => n.data('role') === 'o' ? 1 : 2, levelWidth: () => 1, minNodeSpacing: 18 },
+    style: [
+      { selector: 'node', style: { 'background-color': css('--muted'), label: 'data(label)', color: css('--ink'), 'font-size': 10, width: 14, height: 14 } },
+      { selector: 'node[role="u"], node[role="v"]', style: { 'background-color': css('--ink'), width: 22, height: 22, 'font-size': 12, 'font-weight': 700 } },
+      { selector: 'edge', style: { 'curve-style': 'bezier', width: 2, 'line-color': css('--accent'), opacity: 0.75 } },
+      { selector: 'edge[kind="target"]', style: { 'line-color': css('--ink'), width: 3, 'line-style': 'solid', 'target-arrow-shape': 'triangle', 'target-arrow-color': css('--ink'), label: 'target', 'font-size': 9, color: css('--muted') } },
+      { selector: 'edge.removed', style: { 'line-style': 'dashed', 'line-color': css('--removed'), opacity: 0.9 } },
+      { selector: 'edge.sel', style: { width: 5, 'line-color': css('--warn') } },
+    ] });
+  S.cy.on('tap', 'edge', (ev) => { const id = ev.target.data('eid'); if (id) select(id); });
+  styleGraph();
+}
+
+function styleGraph() {
+  if (!S.cy || !S.trace) return;
+  const n = S.trace.events.length;
+  S.trace.events.forEach(e => {
+    const ed = S.cy.$id('e' + e.edge_idx);
+    ed.toggleClass('removed', S.removed.has(e.edge_idx)); ed.toggleClass('sel', S.selected === e.edge_idx);
+    ed.style('width', S.selected === e.edge_idx ? 5 : 1 + 4 * (1 - (rankOf(e) - 1) / Math.max(1, n)));
+  });
+}
+
+function select(e) { S.selected = e; updateButtons(); renderAll(); }
+
+function verEvent(e) { return S.ver ? S.ver.events.find(x => x.edge_idx === e) : null; }
+
+function renderEvidence() {
+  const m = $('explSel').value, vx = S.ver && S.ver.explainers[m];
+  $('flagBadge').innerHTML = vx ? `<span class="flag ${vx.flag}">${vx.flag}</span>` : '';
+  $('flagReason').textContent = vx ? vx.reason : (m === 'bruteforce' ? 'Brute force is the ground truth that replay deltas define; no flag.' : (S.ver ? `No verification stored for ${m}.` : ''));
+  if (S.selected === null || !S.trace) { $('evidence').textContent = 'Select a candidate event.'; return; }
+  const e = S.trace.events.find(x => x.edge_idx === S.selected), v = verEvent(S.selected);
+  const imp = S.expl ? S.expl.importance[S.selected] : undefined;
+  $('evidence').innerHTML = `<div class="grid2">
+    <span>event</span><span>${e.edge_idx} · ${e.u}–${e.v} · t=${e.t.toFixed(1)}</span>
+    <span>A · ${m} rank</span><span>${rankOf(e)} of ${S.trace.events.length} (importance ${fmt(imp, 3)})</span>
+    <span>B · replay Δ</span><span class="${e.bruteforce_delta < 0 ? 'neg' : 'pos'}">${sgn(e.bruteforce_delta, 5)}</span>
+    <span>C · linear estimate</span><span>${v && v.signal_c_linear_estimate !== undefined ? sgn(v.signal_c_linear_estimate, 5) : '–'}</span>
+    <span>&nbsp;&nbsp;structural term</span><span>${v ? sgn(v.structural_term, 5) : '–'}</span>
+    <span>&nbsp;&nbsp;memory term (grad·Δm)</span><span>${v ? sgn(v.memory_linear_term, 5) : '–'}</span>
+    <span>|B − C| nonlinearity</span><span>${v ? fmt(v.nonlinearity, 5) : '–'}</span>
+    <span>brute-force rank</span><span>${e.ranks.bruteforce ?? '–'}</span>
+  </div>
+  <p class="note">C is a first-order (linear) estimate of B around the baseline state, not independent evidence. |B − C| measures model nonlinearity around this state.</p>`;
+}
+
+function renderAgreement() {
+  const m = $('explSel').value, vx = S.ver && S.ver.explainers[m];
+  if (!S.ver) return;
+  if (!vx) { $('agreement').textContent = `No stored agreement for ${m}.`; return; }
+  $('agreement').innerHTML = `<div class="grid2">
+    <span>Spearman(importance, −Δ)</span><span>${fmt(vx.agreement, 3)}</span>
+    <span>null percentile</span><span>${fmt(vx.null_percentile, 1)} (1000 random permutations)</span>
+    <span>τ (chosen on val)</span><span>${fmt(S.ver.tau, 5)}</span>
+  </div>`;
+}
+
+function updateButtons() {
+  $('btnToggle').disabled = S.selected === null;
+  $('btnToggle').textContent = S.selected !== null && S.removed.has(S.selected) ? 'Keep selected' : 'Remove selected';
+  $('btnReplay').disabled = S.removed.size === 0;
+  $('btnRestore').disabled = S.removed.size === 0;
+  $('removedNote').textContent = `${S.removed.size} removed` + (S.removed.size ? ` [${[...S.removed].join(', ')}]` : '');
+}
+
+function toggleRemove() {
+  if (S.selected === null) return;
+  S.removed.has(S.selected) ? S.removed.delete(S.selected) : S.removed.add(S.selected);
+  updateButtons(); renderAll();
+}
+
+async function replay() {
+  $('btnReplay').disabled = true;
+  $('cfOut').innerHTML = '<span class="spinner"></span> replaying…';
+  try {
+    const r = await api('/api/counterfactual', { target_id: S.trace.target.id, removed_edge_idxs: [...S.removed] });
+    const flip = r.baseline_class !== r.cf_class;
+    $('cfOut').innerHTML = `<div class="cf"><div class="tag">counterfactual (did not happen)</div>
+      <div class="bars">
+        <span>baseline</span><div class="bar"><i style="width:${100 * r.baseline_score}%"></i></div><span class="num">${fmt(r.baseline_score)}</span>
+        <span>counterfactual</span><div class="bar cfbar"><i style="width:${100 * r.cf_score}%"></i></div><span class="num">${fmt(r.cf_score)}</span>
+      </div>
+      <div class="grid2">
+        <span>Δ = cf − baseline</span><span class="${r.delta < 0 ? 'neg' : 'pos'}">${sgn(r.delta, 5)}</span>
+        <span>class</span><span>${r.baseline_class ? 'link' : 'no link'} → ${r.cf_class ? 'link' : 'no link'} ${flip ? '(flipped)' : '(unchanged)'}</span>
+        <span>removed</span><span>[${r.removed.join(', ')}]</span>
+        <span>events replayed</span><span>${r.replayed_events}</span>
+        <span>checkpoint used</span><span>${r.checkpoint_used === null ? 'none (full replay)' : 'batch ' + r.checkpoint_used}</span>
+        <span>latency</span><span>${r.latency_ms.toFixed(0)} ms${r.cached ? ' (cached result)' : ''}</span>
+      </div><p class="note">Bar marker = decision threshold 0.5.</p></div>`;
+  } catch (e) { $('cfOut').innerHTML = `<span class="err">${e.message}</span>`; }
+  updateButtons();
+}
+
+function restore() { S.removed = new Set(); updateButtons(); renderAll(); $('cfOut').innerHTML = '<div class="note">Restored to the baseline view (nothing removed).</div>'; }
+
+init();
+</script>
+</body>
+</html>
