@@ -1,0 +1,11 @@
+{
+  "name": "synthwiki",
+  "n_users": 6000,
+  "n_items": 1000,
+  "n_events": 80000,
+  "n_triggers": 20,
+  "span_days": 30.0,
+  "seed": 0,
+  "n_rows": 80000,
+  "n_planted": 661
+}

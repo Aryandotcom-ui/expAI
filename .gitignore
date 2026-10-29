@@ -14,3 +14,6 @@ results/*/baseline_scores.csv
 results/*/verification_null.npz
 train_*.log
 results/*.pkl
+results/*/verification_api/
+results/*/*.log
+results/*/bench_stdout.txt

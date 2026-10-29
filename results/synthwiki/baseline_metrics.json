@@ -1,0 +1,13 @@
+{
+  "test_ap_batch_mean": 0.9315747851777854,
+  "test_auc_batch_mean": 0.9087247916666666,
+  "test_ap_pooled": 0.9312386163925359,
+  "test_auc_pooled": 0.90854075,
+  "n_test_events": 12000,
+  "n_batches": 400,
+  "first_test_batch": 340,
+  "seconds": 48.66748251700028,
+  "frac_test_scores_ge_threshold": 0.8041666666666667,
+  "checkpoint_batches": 22,
+  "checkpoint_disk_mb": 472.20836448669434
+}

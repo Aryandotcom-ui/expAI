@@ -1,0 +1,11 @@
+explainer  flag        
+cody       CONSISTENT      80
+           DISAGREEMENT    14
+           INSUFFICIENT     6
+greedy     CONSISTENT      78
+           DISAGREEMENT    16
+           INSUFFICIENT     6
+recency    CONSISTENT      80
+           DISAGREEMENT    14
+           INSUFFICIENT     6
+dtype: int64

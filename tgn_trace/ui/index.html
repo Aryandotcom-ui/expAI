@@ -109,8 +109,8 @@ tr { cursor: pointer; }
       <h2>Subgraph</h2>
       <div id="graph"></div>
       <div class="legend" style="margin-top:6px">
-        <span><i style="border-color:var(--accent)"></i>candidate event</span>
-        <span><i style="border-color:var(--ink)"></i>target (u → v)</span>
+        <span><i style="border-color:var(--accent)"></i>candidate events (×n = several; thicker = higher rank)</span>
+        <span><i style="border-color:var(--ink);border-top-style:dotted"></i>target (u → v)</span>
         <span><i style="border-color:var(--removed);border-top-style:dashed"></i>removed</span>
       </div>
     </section>
@@ -141,7 +141,11 @@ tr { cursor: pointer; }
 const $ = (id) => document.getElementById(id);
 const S = { targets: [], trace: null, ver: null, expl: null, selected: null, removed: new Set(), cy: null, chart: null };
 const fmt = (x, d = 4) => (x === null || x === undefined || Number.isNaN(x)) ? '–' : Number(x).toFixed(d);
-const sgn = (x, d = 4) => (x === null || x === undefined) ? '–' : (x > 0 ? '+' : '') + Number(x).toFixed(d);
+const sgn = (x, d = 4) => {
+  if (x === null || x === undefined) return '–';
+  if (x !== 0 && Math.abs(x) < 0.5 * Math.pow(10, -d)) return (x > 0 ? '+' : '') + Number(x).toExponential(1);
+  return (x > 0 ? '+' : '') + Number(x).toFixed(d);
+};
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 
 async function api(path, body) {
@@ -161,7 +165,13 @@ async function init() {
     $('btnToggle').onclick = toggleRemove;
     $('btnReplay').onclick = replay;
     $('btnRestore').onclick = restore;
-    if (S.targets.length) loadTarget(S.targets[0].id);
+    const want = +new URLSearchParams(location.search).get('target');
+    if (want && !S.targets.some(t => t.id === want)) {
+      S.targets.unshift({ id: want, u: '?', v: '?', baseline_score: NaN, has_verification: false });
+      $('targetSel').insertAdjacentHTML('afterbegin', `<option value="${want}">#${want}</option>`);
+    }
+    const first = want || (S.targets.length ? S.targets[0].id : null);
+    if (first) { $('targetSel').value = String(first); loadTarget(first); }
   } catch (e) { $('evidence').innerHTML = `<span class="err">Could not reach the API: ${e.message}</span>`; }
 }
 
@@ -232,33 +242,41 @@ function renderTimeline() {
   $('tlNote').textContent = `${$('explSel').value} ranking`;
 }
 
+function pairKey(e) { return e.u < e.v ? `${e.u}-${e.v}` : `${e.v}-${e.u}`; }
+
 function renderGraph() {
   const t = S.trace.target, els = [], nodes = new Set([t.u, t.v]);
-  S.trace.events.forEach(e => { nodes.add(e.u); nodes.add(e.v); });
+  S.pairs = {};
+  S.trace.events.forEach(e => { nodes.add(e.u); nodes.add(e.v); (S.pairs[pairKey(e)] = S.pairs[pairKey(e)] || []).push(e); });
   nodes.forEach(n => els.push({ data: { id: 'n' + n, label: n === t.u ? `u=${n}` : n === t.v ? `v=${n}` : String(n), role: n === t.u ? 'u' : n === t.v ? 'v' : 'o' } }));
-  S.trace.events.forEach(e => els.push({ data: { id: 'e' + e.edge_idx, source: 'n' + e.u, target: 'n' + e.v, eid: e.edge_idx } }));
+  // One edge per node pair; its label is the number of candidate events between the pair.
+  Object.entries(S.pairs).forEach(([k, evs]) => els.push({ data: { id: 'p' + k, source: 'n' + evs[0].u, target: 'n' + evs[0].v, pair: k, label: evs.length > 1 ? `×${evs.length}` : '' } }));
   els.push({ data: { id: 'target', source: 'n' + t.u, target: 'n' + t.v, kind: 'target' } });
   if (S.cy) S.cy.destroy();
-  S.cy = cytoscape({ container: $('graph'), elements: els, layout: { name: 'concentric', concentric: n => n.data('role') === 'o' ? 1 : 2, levelWidth: () => 1, minNodeSpacing: 18 },
+  S.cy = cytoscape({ container: $('graph'), elements: els, layout: { name: 'concentric', concentric: n => n.data('role') === 'o' ? 1 : 2, levelWidth: () => 1, minNodeSpacing: 30 },
     style: [
       { selector: 'node', style: { 'background-color': css('--muted'), label: 'data(label)', color: css('--ink'), 'font-size': 10, width: 14, height: 14 } },
       { selector: 'node[role="u"], node[role="v"]', style: { 'background-color': css('--ink'), width: 22, height: 22, 'font-size': 12, 'font-weight': 700 } },
-      { selector: 'edge', style: { 'curve-style': 'bezier', width: 2, 'line-color': css('--accent'), opacity: 0.75 } },
-      { selector: 'edge[kind="target"]', style: { 'line-color': css('--ink'), width: 3, 'line-style': 'solid', 'target-arrow-shape': 'triangle', 'target-arrow-color': css('--ink'), label: 'target', 'font-size': 9, color: css('--muted') } },
+      { selector: 'edge', style: { 'curve-style': 'bezier', width: 2, 'line-color': css('--accent'), opacity: 0.8, label: 'data(label)', 'font-size': 9, color: css('--muted'), 'text-background-color': css('--panel'), 'text-background-opacity': 1 } },
+      { selector: 'edge[kind="target"]', style: { 'line-color': css('--ink'), width: 3, 'target-arrow-shape': 'triangle', 'target-arrow-color': css('--ink'), label: 'target', 'line-style': 'dotted' } },
       { selector: 'edge.removed', style: { 'line-style': 'dashed', 'line-color': css('--removed'), opacity: 0.9 } },
-      { selector: 'edge.sel', style: { width: 5, 'line-color': css('--warn') } },
+      { selector: 'edge.sel', style: { 'line-color': css('--warn') } },
     ] });
-  S.cy.on('tap', 'edge', (ev) => { const id = ev.target.data('eid'); if (id) select(id); });
+  S.cy.on('tap', 'edge', (ev) => {
+    const evs = S.pairs[ev.target.data('pair')];
+    if (evs) select([...evs].sort((a, b) => rankOf(a) - rankOf(b))[0].edge_idx);
+  });
   styleGraph();
 }
 
 function styleGraph() {
-  if (!S.cy || !S.trace) return;
+  if (!S.cy || !S.trace || !S.pairs) return;
   const n = S.trace.events.length;
-  S.trace.events.forEach(e => {
-    const ed = S.cy.$id('e' + e.edge_idx);
-    ed.toggleClass('removed', S.removed.has(e.edge_idx)); ed.toggleClass('sel', S.selected === e.edge_idx);
-    ed.style('width', S.selected === e.edge_idx ? 5 : 1 + 4 * (1 - (rankOf(e) - 1) / Math.max(1, n)));
+  Object.entries(S.pairs).forEach(([k, evs]) => {
+    const ed = S.cy.$id('p' + k), best = Math.min(...evs.map(rankOf));
+    ed.toggleClass('removed', evs.every(e => S.removed.has(e.edge_idx)));
+    ed.toggleClass('sel', evs.some(e => e.edge_idx === S.selected));
+    ed.style('width', 1.5 + 5 * (1 - (best - 1) / Math.max(1, n)));
   });
 }
 
@@ -326,8 +344,8 @@ async function replay() {
         <span>Δ = cf − baseline</span><span class="${r.delta < 0 ? 'neg' : 'pos'}">${sgn(r.delta, 5)}</span>
         <span>class</span><span>${r.baseline_class ? 'link' : 'no link'} → ${r.cf_class ? 'link' : 'no link'} ${flip ? '(flipped)' : '(unchanged)'}</span>
         <span>removed</span><span>[${r.removed.join(', ')}]</span>
-        <span>events replayed</span><span>${r.replayed_events}</span>
-        <span>checkpoint used</span><span>${r.checkpoint_used === null ? 'none (full replay)' : 'batch ' + r.checkpoint_used}</span>
+        <span>events replayed</span><span>${r.replayed_events}${r.replayed_events === 0 ? ' (removed events are in the target\'s own batch: memory is unchanged, only the neighborhood differs)' : ''}</span>
+        <span>state restored from</span><span>${r.checkpoint_used === null ? 'none (full replay)' : 'start of batch ' + r.checkpoint_used + (r.state_source ? ` (${r.state_source === 'ram' ? 'in-RAM baseline state' : r.state_source === 'disk' ? 'disk checkpoint' : 'reset state'})` : '')}</span>
         <span>latency</span><span>${r.latency_ms.toFixed(0)} ms${r.cached ? ' (cached result)' : ''}</span>
       </div><p class="note">Bar marker = decision threshold 0.5.</p></div>`;
   } catch (e) { $('cfOut').innerHTML = `<span class="err">${e.message}</span>`; }

@@ -94,6 +94,29 @@ def e5_summary(cfg):
       structural_share_median=float((ev.structural_term.abs() / (ev.structural_term.abs()
                                      + ev.memory_exact_term.abs()).replace(0, np.nan)).median()),
       max_c_vs_b_replay_check=float(ev.c_vs_b_replay_check.max()))
+    m = ev[ev.memory_exact_term != 0]
+    rel = (m.memory_linear_term - m.memory_exact_term).abs() / m.memory_exact_term.abs()
+    out['signal_c'].update(
+      n_events_memory_effect_nonzero=int(len(m)),
+      memory_linear_rel_err_median=float(rel.median()) if len(m) else None,
+      memory_linear_rel_err_p90=float(rel.quantile(0.9)) if len(m) else None,
+      memory_linear_sign_agreement=float((np.sign(m.memory_linear_term) == np.sign(m.memory_exact_term)).mean())
+      if len(m) else None,
+      frac_strong_events_with_memory_effect=float((ev[ev.signal_b_delta.abs() >= tau].memory_exact_term != 0).mean()))
+    # Where does a single removal act: memory or neighborhood? Broken down by batch distance.
+    rows = []
+    for path in (cfg.results_dir / 'verification').glob('*.json'):
+      r = json.loads(path.read_text())
+      for e in r['events']:
+        rows.append(dict(dist=r['target']['batch'] - e['batch'], mem=e['memory_exact_term'],
+                         struct=e['structural_term'], b=e['signal_b_delta']))
+    d = pd.DataFrame(rows)
+    by_dist = {}
+    for k, g in d.groupby(np.minimum(d.dist, 3)):
+      by_dist['3+' if k == 3 else str(int(k))] = dict(
+        n=int(len(g)), frac_memory_term_zero=float((g.mem == 0).mean()),
+        median_abs_b=float(g.b.abs().median()), frac_abs_b_ge_tau=float((g.b.abs() >= tau).mean()))
+    out['effect_channel_by_batch_distance'] = by_dist
     # Ablation: flags computed with C in place of B (what you would conclude without replay)
     changed = 0
     total = 0
@@ -107,6 +130,23 @@ def e5_summary(cfg):
       changed += f_c != g.flag.iloc[0]
       total += 1
     out['ablation_flags_with_c_instead_of_b'] = dict(changed=int(changed), total=int(total))
+  # Sensitivity only (tau itself is fixed by the validation rule): flag distribution per tau
+  from tgn_trace.verify.flags import flag as _flag
+  sens = {}
+  for g_tau in (tau, 0.005, 0.01, 0.02):
+    counts = {}
+    for (tid, name), g in ver.groupby(['target_id', 'explainer']):
+      e = ev[ev.target_id == tid]
+      d = dict(zip(e.edge_idx.astype(int), e.signal_b_delta))
+      rank_col = f'rank_{name}'
+      ranked = list(e.sort_values(rank_col).edge_idx.astype(int)) if rank_col in e else []
+      if not ranked:
+        continue
+      f, _ = _flag(ranked, d, g_tau)
+      counts.setdefault(name, {}).setdefault(f, 0)
+      counts[name][f] += 1
+    sens[f'{g_tau:.4f}'] = counts
+  out['flag_sensitivity_to_tau'] = sens
   return out
 
 
@@ -173,7 +213,7 @@ def figures(cfg, e2):
       ax.hist(obs, bins=bins, density=True, color=METHOD_COLORS[n], alpha=0.85, label=f'{n} (observed)')
       ax.set_xlabel('Spearman(importance, −Δ)')
       ax.set_title(f'{n}: median ρ={obs.median():.2f}', loc='left', fontsize=10)
-      ax.legend(frameon=False, fontsize=8)
+      ax.legend(frameon=True, framealpha=0.92, edgecolor='none', fontsize=7.5, loc='upper left')
     axes[0].set_ylabel('density')
     fig.suptitle(f'Agreement with replay vs permutation null ({cfg.data})', x=0.01, ha='left', fontsize=11)
     fig.tight_layout()
@@ -211,6 +251,17 @@ def main():
     agg[m] = a
   summary['E2_explainers'] = dict(tau_for_relevant_set=tau, n_relevant_mean=float(e2.groupby('target').n_relevant.first().mean()),
                                   per_method=agg)
+  ver_path = res / 'verification.csv'
+  if ver_path.exists() and 'greedy' in set(e2.method):
+    # Set effects vs the largest single-event effect: what single-event explanations miss
+    g = e2[e2.method == 'greedy'].set_index('target')
+    drop = g.baseline_score - g.cf_final_score
+    ver = pd.read_csv(ver_path)
+    max_single = ver[ver.explainer == 'greedy'].set_index('target_id').max_abs_delta.reindex(drop.index)
+    summary['E2_explainers']['set_vs_single'] = dict(
+      greedy_set_drop_median=float(drop.median()), greedy_set_drop_q25=float(drop.quantile(0.25)),
+      greedy_set_drop_q75=float(drop.quantile(0.75)), max_single_abs_delta_median=float(max_single.median()),
+      ratio_median=float((drop / max_single).median()))
   bench = res / 'replay_bench_summary.json'
   if bench.exists():
     b = json.loads(bench.read_text())

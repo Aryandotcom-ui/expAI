@@ -1,0 +1,75 @@
+ target            kind  distance_batches  full_ms  checkpointed_ms  speedup  abs_err
+  69355  single-nearest                 0 4.13e+04         1.05e+03     39.3        0
+  69355 single-farthest                 1  3.1e+04              788     39.4        0
+  69355   single-middle                 0 3.19e+04              959     33.3        0
+  69355         multi-3                 1 3.03e+04              777       39        0
+  73623  single-nearest                 1  3.2e+04              835     38.3        0
+  73623 single-farthest                 4 3.22e+04              936     34.4        0
+  73623   single-middle                 2 3.07e+04            1e+03     30.7        0
+  73623         multi-3                 3    3e+04              780     38.4        0
+  78905  single-nearest                 1 3.19e+04              693       46        0
+  78905 single-farthest                12 3.47e+04         1.54e+03     22.5        0
+  78905   single-middle                 8 3.56e+04         1.63e+03     21.8        0
+  78905         multi-3                11 3.05e+04         1.68e+03     18.1        0
+  77173  single-nearest                 0 2.94e+04              623     47.3        0
+  77173 single-farthest                 1  3.2e+04              692     46.2        0
+  77173   single-middle                 0 3.09e+04              670     46.2        0
+  77173         multi-3                 1 3.21e+04              562     57.1        0
+  77521  single-nearest                 0 3.23e+04         1.04e+03       31        0
+  77521 single-farthest                 1 3.35e+04              745     44.9        0
+  77521   single-middle                 1 3.45e+04              895     38.6        0
+  77521         multi-3                 1 3.56e+04         1.06e+03     33.6        0
+  78346  single-nearest                24 3.48e+04         3.06e+03     11.4        0
+  78346 single-farthest               277  3.1e+04         3.39e+04    0.914        0
+  78346   single-middle               157 3.23e+04         3.01e+04     1.07        0
+  78346         multi-3               187 2.94e+04          3.2e+04    0.917        0
+  79920  single-nearest                 0  3.2e+04              880     36.3        0
+  79920 single-farthest                 1 3.49e+04         1.19e+03     29.5        0
+  79920   single-middle                 0 3.27e+04         1.01e+03     32.3        0
+  79920         multi-3                 1 3.56e+04         1.11e+03       32        0
+  75078  single-nearest                 0    3e+04              593     50.6        0
+  75078 single-farthest                 1 2.83e+04              576     49.2        0
+  75078   single-middle                 0  2.8e+04              719     38.9        0
+  75078         multi-3                 1  2.9e+04              691       42        0
+  78217  single-nearest                 4 3.33e+04         1.15e+03     28.9        0
+  78217 single-farthest               116 3.39e+04         3.14e+04     1.08        0
+  78217   single-middle                38 3.15e+04         3.85e+03     8.18        0
+  78217         multi-3                19  3.3e+04         1.89e+03     17.4        0
+  74901  single-nearest                 0 3.05e+04              587     51.9        0
+  74901 single-farthest                 1 3.34e+04              490     68.3        0
+  74901   single-middle                 1 3.24e+04              506     63.9        0
+  74901         multi-3                 1 3.16e+04              513     61.6        0
+  79446  single-nearest                 1 3.44e+04              791     43.5        0
+  79446 single-farthest                30  3.3e+04         3.73e+03     8.86        0
+  79446   single-middle                22 3.01e+04         2.54e+03     11.8        0
+  79446         multi-3                25 3.36e+04            3e+03     11.2        0
+  77204  single-nearest                 1 3.26e+04              711     45.8        0
+  77204 single-farthest                 2 3.16e+04              690     45.8        0
+  77204   single-middle                 1 2.98e+04              680     43.8        0
+  77204         multi-3                 2 3.12e+04              633     49.3        0
+{
+  "n_pairs": 48,
+  "max_abs_err": 0.0,
+  "mean_abs_err": 0.0,
+  "full_ms": {
+    "median": 31976.120423999873,
+    "q25": 30668.57945474999,
+    "q75": 33432.351076999796
+  },
+  "checkpointed_ms": {
+    "median": 887.6113164999424,
+    "q25": 690.4803155001673,
+    "q75": 1562.747960250249
+  },
+  "speedup": {
+    "median": 38.360677206710605,
+    "q25": 22.34692784969291,
+    "q75": 45.87999947614496
+  },
+  "distance_batches": {
+    "median": 1.0,
+    "q25": 1.0,
+    "q75": 8.75
+  }
+}
+EXIT 0

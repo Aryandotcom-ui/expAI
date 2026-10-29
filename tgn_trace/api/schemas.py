@@ -79,4 +79,5 @@ class CounterfactualResponse(BaseModel):
   replayed_events: int
   latency_ms: float
   checkpoint_used: Optional[int]
+  state_source: Optional[str] = None
   cached: bool = False

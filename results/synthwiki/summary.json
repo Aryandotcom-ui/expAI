@@ -1,0 +1,303 @@
+{
+  "config": {
+    "data": "synthwiki",
+    "model_prefix": "tgn-attn",
+    "model_path": "",
+    "device": "auto",
+    "n_layer": 1,
+    "n_degree": 10,
+    "n_head": 2,
+    "drop_out": 0.1,
+    "memory_dim": 172,
+    "message_dim": 100,
+    "message_function": "identity",
+    "memory_updater": "gru",
+    "aggregator": "last",
+    "embedding_module": "graph_attention",
+    "batch_size": 200,
+    "checkpoint_every": 10,
+    "checkpoint_lead_batches": 50,
+    "checkpoint_sparse_every": 25,
+    "checkpoint_cache_size": 4,
+    "k_candidates": 20,
+    "threshold": 0.5,
+    "greedy_max_size": 5,
+    "max_removed": 10,
+    "seed": 0,
+    "model_file": "/home/user/expAI/saved_models/tgn-attn-synthwiki.pth"
+  },
+  "git_hash": "3c3dd2676015ac3605da2674e9851e9a1dbc7877",
+  "data": "synthwiki",
+  "E1_baseline": {
+    "test_ap_batch_mean": 0.9315747851777854,
+    "test_auc_batch_mean": 0.9087247916666666,
+    "test_ap_pooled": 0.9312386163925359,
+    "test_auc_pooled": 0.90854075,
+    "n_test_events": 12000,
+    "n_batches": 400,
+    "first_test_batch": 340,
+    "seconds": 48.66748251700028,
+    "frac_test_scores_ge_threshold": 0.8041666666666667,
+    "checkpoint_batches": 22,
+    "checkpoint_disk_mb": 472.20836448669434
+  },
+  "E2_explainers": {
+    "tau_for_relevant_set": 0.001,
+    "n_relevant_mean": 4.68,
+    "per_method": {
+      "cody": {
+        "p@1_vs_bf": 0.6,
+        "p@1_vs_rel": 0.8,
+        "r@1_vs_rel": 0.25958686542925674,
+        "p@3_vs_bf": 0.5700000000000001,
+        "p@3_vs_rel": 0.5799999999999998,
+        "r@3_vs_rel": 0.5242868996945084,
+        "p@5_vs_bf": 0.5059999999999999,
+        "p@5_vs_rel": 0.45600000000000007,
+        "r@5_vs_rel": 0.6208360932545716,
+        "n_targets": 100,
+        "runtime_ms_median": 5180.839557000127,
+        "model_evals_mean": 56.11,
+        "status": {
+          "no_solution": 65,
+          "ok": 35
+        },
+        "cf_success_rate": 0.35,
+        "cf_mean_size_successful": 3.6
+      },
+      "greedy": {
+        "p@1_vs_bf": 1.0,
+        "p@1_vs_rel": 0.92,
+        "r@1_vs_rel": 0.3356738219509959,
+        "p@3_vs_bf": 0.75,
+        "p@3_vs_rel": 0.7266666666666667,
+        "r@3_vs_rel": 0.637826801821367,
+        "p@5_vs_bf": 0.698,
+        "p@5_vs_rel": 0.568,
+        "r@5_vs_rel": 0.7366718577316402,
+        "n_targets": 100,
+        "runtime_ms_median": 11959.626690500045,
+        "model_evals_mean": 72.89,
+        "status": {
+          "no_solution": 65,
+          "ok": 35
+        },
+        "cf_success_rate": 0.35,
+        "cf_mean_size_successful": 2.2285714285714286
+      },
+      "recency": {
+        "p@1_vs_bf": 0.41,
+        "p@1_vs_rel": 0.58,
+        "r@1_vs_rel": 0.2331932711008798,
+        "p@3_vs_bf": 0.44,
+        "p@3_vs_rel": 0.4866666666666667,
+        "r@3_vs_rel": 0.43919765319221843,
+        "p@5_vs_bf": 0.458,
+        "p@5_vs_rel": 0.41600000000000004,
+        "r@5_vs_rel": 0.5593881511001075,
+        "n_targets": 100,
+        "runtime_ms_median": 0.17604900040169014,
+        "model_evals_mean": 0.0,
+        "status": {
+          "ok": 100
+        }
+      }
+    },
+    "set_vs_single": {
+      "greedy_set_drop_median": 0.1704942286014557,
+      "greedy_set_drop_q25": 0.0447283536195755,
+      "greedy_set_drop_q75": 0.47101104259490967,
+      "max_single_abs_delta_median": 0.037708282470703125,
+      "ratio_median": 2.9472949466655636
+    }
+  },
+  "E3_replay_correctness": {
+    "max_abs_err": 0.0,
+    "mean_abs_err": 0.0,
+    "n_pairs": 48
+  },
+  "E4_replay_latency": {
+    "full_ms": {
+      "median": 2073.6139395003192,
+      "q25": 1940.7174512498386,
+      "q75": 2190.1215084997148
+    },
+    "checkpointed_ms": {
+      "median": 221.59163700007412,
+      "q25": 187.84807650035873,
+      "q75": 353.49008499952106
+    },
+    "speedup": {
+      "median": 9.24815284112278,
+      "q25": 5.685842284840481,
+      "q75": 11.401191145718691
+    },
+    "distance_batches": {
+      "median": 1.0,
+      "q25": 1.0,
+      "q75": 8.75
+    }
+  },
+  "E5_verification": {
+    "n_targets": 100,
+    "tau": 0.001,
+    "per_explainer": {
+      "cody": {
+        "flags": {
+          "CONSISTENT": 80,
+          "DISAGREEMENT": 14,
+          "INSUFFICIENT": 6
+        },
+        "agreement_median": 0.12529049897470948,
+        "agreement_mean": 0.137812927051008,
+        "null_percentile_median": 68.525,
+        "frac_null_percentile_ge_95": 0.3,
+        "n_nan_agreement": 0
+      },
+      "greedy": {
+        "flags": {
+          "CONSISTENT": 78,
+          "DISAGREEMENT": 16,
+          "INSUFFICIENT": 6
+        },
+        "agreement_median": 0.6088553639832597,
+        "agreement_mean": 0.6134066823356144,
+        "null_percentile_median": 99.7,
+        "frac_null_percentile_ge_95": 0.86,
+        "n_nan_agreement": 0
+      },
+      "recency": {
+        "flags": {
+          "CONSISTENT": 80,
+          "DISAGREEMENT": 14,
+          "INSUFFICIENT": 6
+        },
+        "agreement_median": 0.07073822225364622,
+        "agreement_mean": 0.07454791555034641,
+        "null_percentile_median": 61.8,
+        "frac_null_percentile_ge_95": 0.26,
+        "n_nan_agreement": 0
+      }
+    },
+    "signal_c": {
+      "n_events": 1990,
+      "median_abs_b_minus_c": 5.960464477539063e-08,
+      "p90_abs_b_minus_c": 0.0011354070622473964,
+      "spearman_b_c": 0.9682273060378572,
+      "frac_sign_disagree_when_b_strong": 0.007202881152460984,
+      "frac_strong_label_changes_if_c_replaced_b": 0.017085427135678392,
+      "structural_share_median": 1.0,
+      "max_c_vs_b_replay_check": 2.980232238769531e-07,
+      "n_events_memory_effect_nonzero": 646,
+      "memory_linear_rel_err_median": 0.13808437270391638,
+      "memory_linear_rel_err_p90": 0.9491771220717966,
+      "memory_linear_sign_agreement": 0.9736842105263158,
+      "frac_strong_events_with_memory_effect": 0.5450180072028812
+    },
+    "effect_channel_by_batch_distance": {
+      "0": {
+        "n": 537,
+        "frac_memory_term_zero": 1.0,
+        "median_abs_b": 0.00046837329864501953,
+        "frac_abs_b_ge_tau": 0.3929236499068901
+      },
+      "1": {
+        "n": 629,
+        "frac_memory_term_zero": 0.8298887122416534,
+        "median_abs_b": 2.980232238769531e-07,
+        "frac_abs_b_ge_tau": 0.27344992050874406
+      },
+      "2": {
+        "n": 117,
+        "frac_memory_term_zero": 0.6581196581196581,
+        "median_abs_b": 0.0003064870834350586,
+        "frac_abs_b_ge_tau": 0.4188034188034188
+      },
+      "3+": {
+        "n": 707,
+        "frac_memory_term_zero": 0.2942008486562942,
+        "median_abs_b": 0.00167924165725708,
+        "frac_abs_b_ge_tau": 0.5671852899575672
+      }
+    },
+    "ablation_flags_with_c_instead_of_b": {
+      "changed": 14,
+      "total": 300
+    },
+    "flag_sensitivity_to_tau": {
+      "0.0010": {
+        "cody": {
+          "CONSISTENT": 80,
+          "INSUFFICIENT": 6,
+          "DISAGREEMENT": 14
+        },
+        "greedy": {
+          "CONSISTENT": 78,
+          "INSUFFICIENT": 6,
+          "DISAGREEMENT": 16
+        },
+        "recency": {
+          "CONSISTENT": 80,
+          "DISAGREEMENT": 14,
+          "INSUFFICIENT": 6
+        }
+      },
+      "0.0050": {
+        "cody": {
+          "CONSISTENT": 55,
+          "INSUFFICIENT": 17,
+          "DISAGREEMENT": 28
+        },
+        "greedy": {
+          "CONSISTENT": 53,
+          "INSUFFICIENT": 17,
+          "DISAGREEMENT": 30
+        },
+        "recency": {
+          "CONSISTENT": 52,
+          "INSUFFICIENT": 17,
+          "DISAGREEMENT": 31
+        }
+      },
+      "0.0100": {
+        "cody": {
+          "CONSISTENT": 40,
+          "INSUFFICIENT": 28,
+          "DISAGREEMENT": 32
+        },
+        "greedy": {
+          "CONSISTENT": 37,
+          "INSUFFICIENT": 28,
+          "DISAGREEMENT": 35
+        },
+        "recency": {
+          "CONSISTENT": 39,
+          "INSUFFICIENT": 28,
+          "DISAGREEMENT": 33
+        }
+      },
+      "0.0200": {
+        "cody": {
+          "DISAGREEMENT": 38,
+          "INSUFFICIENT": 36,
+          "CONSISTENT": 26
+        },
+        "greedy": {
+          "DISAGREEMENT": 40,
+          "INSUFFICIENT": 36,
+          "CONSISTENT": 24
+        },
+        "recency": {
+          "DISAGREEMENT": 37,
+          "INSUFFICIENT": 36,
+          "CONSISTENT": 27
+        }
+      }
+    }
+  },
+  "figures": [
+    "latency_vs_distance.png",
+    "precision_at_k.png",
+    "agreement_vs_null.png"
+  ]
+}

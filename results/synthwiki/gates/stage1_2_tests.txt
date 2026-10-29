@@ -1,0 +1,18 @@
+
+target 69355: baseline=0.984850 replay=0.984850 replayed=69200 latency=2322ms
+
+target 73623: baseline=0.862535 replay=0.862535 replayed=73600 latency=1974ms
+
+target 78905: baseline=0.881625 replay=0.881625 replayed=78800 latency=2209ms
+.
+target 68282: remove 68272 -> delta=-0.001045; empty again -> +0.00e+00
+.
+target 74907: unreachable event 74601 (1 batches back) -> delta=+0.00e+00
+
+target 71367: unreachable event 71001 (1 batches back) -> delta=+0.00e+00
+.
+removing the most recent event of u changed the score for 15/15 targets (5 of 20 sampled targets had no event of u among their K candidates)
+.
+36 pairs ({'single-nearest': 9, 'single-farthest': 9, 'single-middle': 9, 'multi-3': 9}), distance 0-355 batches, max |ckpt - full| = 0.00e+00, median speed-up 6.8x
+.
+5 passed in 145.89s (0:02:25)

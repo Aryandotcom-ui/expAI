@@ -7,7 +7,7 @@ import threading
 from functools import lru_cache
 
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -44,8 +44,13 @@ def _tau():
 
 
 def _verification(target_id):
-  path = _results() / 'verification' / f'{int(target_id)}.json'
-  return json.loads(path.read_text()) if path.exists() else None
+  # verification/ holds the experiment set (verify/run.py); verification_api/ holds results the
+  # API computed on demand, kept apart so they never mix into the experiments.
+  for sub in ('verification', 'verification_api'):
+    path = _results() / sub / f'{int(target_id)}.json'
+    if path.exists():
+      return json.loads(path.read_text())
+  return None
 
 
 def _check_target(target_id):
@@ -79,6 +84,12 @@ def health():
 def targets():
   cfg, env, replayer = ctx()
   verified = sorted(int(p.stem) for p in (cfg.results_dir / 'verification').glob('*.json'))
+  # Put targets with a successful greedy counterfactual first (most informative to replay)
+  e2 = cfg.results_dir / 'e2_explainers.csv'
+  if e2.exists():
+    df = pd.read_csv(e2)
+    flips = set(df[(df.method == 'greedy') & (df.cf_success == True)].target.astype(int))  # noqa: E712
+    verified.sort(key=lambda t: (t not in flips, t))
   ids = verified[:N_DEMO_TARGETS]
   if len(ids) < N_DEMO_TARGETS:
     df = pd.read_csv(cfg.results_dir / 'baseline_scores.csv')
@@ -160,7 +171,7 @@ def verification(target_id: int):
   from tgn_trace.verify.run import verify_target
   with _LOCK:
     ver, _ = verify_target(replayer, target_id, tau)
-  path = cfg.results_dir / 'verification' / f'{int(target_id)}.json'
+  path = cfg.results_dir / 'verification_api' / f'{int(target_id)}.json'
   path.parent.mkdir(parents=True, exist_ok=True)
   path.write_text(json.dumps(ver, default=float))
   return json.loads(path.read_text())
@@ -170,5 +181,6 @@ app.mount('/ui', StaticFiles(directory=ROOT / 'tgn_trace' / 'ui', html=True), na
 
 
 @app.get('/', include_in_schema=False)
-def index():
-  return RedirectResponse('/ui/')
+def index(request: Request):
+  query = f'?{request.url.query}' if request.url.query else ''
+  return RedirectResponse(f'/ui/{query}')

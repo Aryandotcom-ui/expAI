@@ -1,0 +1,22 @@
+
+target 69355: baseline=0.984850 replay=0.984850 replayed=69200 latency=36376ms
+
+target 73623: baseline=0.862535 replay=0.862535 replayed=73600 latency=36137ms
+
+target 78905: baseline=0.881625 replay=0.881625 replayed=78800 latency=40470ms
+.
+target 68282: remove 68272 -> delta=-0.001045; empty again -> +0.00e+00
+.
+target 74907: unreachable event 74601 (1 batches back) -> delta=+0.00e+00
+
+target 71367: unreachable event 71001 (1 batches back) -> delta=+0.00e+00
+.
+removing the most recent event of u changed the score for 15/15 targets
+.
+4 passed in 752.17s (0:12:32)
+
+real	12m35.654s
+user	39m17.522s
+sys	1m2.621s
+
+[exited with code 0]
