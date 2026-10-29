@@ -45,6 +45,9 @@ class TraceConfig:
   batch_size: int = 200
   checkpoint_every: int = field(default_factory=lambda: _env('TGN_TRACE_CKPT_EVERY', 10, int))
   checkpoint_lead_batches: int = 50  # batches before the first test batch that get checkpoints
+  # Sparse checkpoints over the rest of the stream, so that removing an old event does not fall
+  # back to replaying from the reset state (0 disables them).
+  checkpoint_sparse_every: int = field(default_factory=lambda: _env('TGN_TRACE_CKPT_SPARSE', 25, int))
   checkpoint_cache_size: int = 4      # checkpoints kept in RAM (each is tens of MB)
 
   # Explanation / verification

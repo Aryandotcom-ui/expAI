@@ -83,6 +83,7 @@ class TraceEnv:
     self.model.load_state_dict(state_dict)
     self.model = self.model.to(self.device)
     self.model.eval()
+    self._fast_ok = os.environ.get('TGN_TRACE_FAST_ADVANCE', '1') != '0'
     self.reset_state()
 
   # ------------------------------------------------------------------ stream / batches
@@ -170,7 +171,34 @@ class TraceEnv:
       return
     src, dst, ts, eidx = self._arrays(positions)
     self.model.set_neighbor_finder(ngh_finder)
-    self.model.compute_temporal_embeddings(src, dst, dst, ts, eidx, self.cfg.n_degree)
+    if self.fast_advance:
+      self._advance_state_only(src, dst, ts, eidx)
+    else:
+      self.model.compute_temporal_embeddings(src, dst, dst, ts, eidx, self.cfg.n_degree)
+
+  @property
+  def fast_advance(self):
+    """Skip the embedding computation when advancing state.
+
+    With memory_update_at_start and messages built from raw memory (the default flags), the only
+    state change in TGN.compute_temporal_embeddings is: update memory of the positives with their
+    pending messages, clear those, store this batch's raw messages. Embeddings (and the all-node
+    get_updated_memory, used only for embeddings and an assert) do not touch the state.
+    tests/test_stage0.py checks bitwise equality with the full code path.
+    """
+    m = self.model
+    return (self._fast_ok and m.memory_update_at_start and not m.dyrep
+            and not m.use_source_embedding_in_message and not m.use_destination_embedding_in_message)
+
+  def _advance_state_only(self, src, dst, ts, eidx):
+    m = self.model
+    positives = np.concatenate([src, dst])
+    m.update_memory(positives, m.memory.messages)
+    m.memory.clear_messages(positives)
+    unique_src, src_msgs = m.get_raw_messages(src, None, dst, None, ts, eidx)
+    unique_dst, dst_msgs = m.get_raw_messages(dst, None, src, None, ts, eidx)
+    m.memory.store_raw_messages(unique_src, src_msgs)
+    m.memory.store_raw_messages(unique_dst, dst_msgs)
 
   @torch.no_grad()
   def batched_probabilities(self, positions, negatives, ngh_finder):

@@ -2,7 +2,8 @@
 
 A checkpoint for batch b is the model state at the START of batch b of the baseline pass (CPU
 tensors, packed). Only the test region plus `checkpoint_lead_batches` batches before it are
-covered; batch 0 (the reset state) is always implicitly available.
+covered densely (every C batches), the rest of the stream sparsely (every `checkpoint_sparse_every`
+batches); batch 0 (the reset state) is always implicitly available.
 """
 import json
 from collections import OrderedDict
@@ -27,7 +28,10 @@ class CheckpointStore:
   def planned_batches(self):
     cfg = self.env.cfg
     start = max(0, self.env.first_test_batch - cfg.checkpoint_lead_batches)
-    return list(range(start, self.env.n_batches, cfg.checkpoint_every))
+    dense = list(range(start, self.env.n_batches, cfg.checkpoint_every))
+    sparse = list(range(cfg.checkpoint_sparse_every, start, cfg.checkpoint_sparse_every)) \
+      if cfg.checkpoint_sparse_every else []
+    return sorted(set(sparse) | set(dense))
 
   def path(self, b):
     return self.dir / f'state_b{b:05d}.pt'

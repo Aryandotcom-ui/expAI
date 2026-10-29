@@ -46,7 +46,7 @@ def bench(replayer, pairs):
   for t, removed, kind in pairs:
     tb = int(env.batch_of[env.pos(t)])
     full = replayer.full_replay(t, removed)
-    ck = replayer.checkpointed_replay(t, removed, use_cache=False)
+    ck = replayer.checkpointed_replay(t, removed, use_cache=False, use_prefix=False)
     rows.append(dict(target=t, kind=kind, removed=' '.join(map(str, removed)), n_removed=len(removed),
                      distance_batches=tb - min(int(env.batch_of[env.pos(e)]) for e in removed),
                      full_ms=full['latency_ms'], checkpointed_ms=ck['latency_ms'],

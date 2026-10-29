@@ -4,21 +4,20 @@ Prerequisites (each writes the inputs this script reads):
   python -m tgn_trace.baseline --checkpoints          E1 (baseline_metrics.json)
   python -m tgn_trace.experiments.bench_replay        E3/E4 (replay_bench.csv)
   python -m tgn_trace.verify.run                      E5 (verification*.csv)
-This script runs E2 itself (explainers vs brute force) and then aggregates everything.
+  (run verify.run with --with_cody --n_test 100 to cover E2 as well)
+This script aggregates: E2 compares each explainer stored per target with brute force.
 
-Usage: python -m tgn_trace.experiments.run_all [--n_targets 100] [--no_cody]
+Usage: python -m tgn_trace.experiments.run_all [--n_targets 100]
 Outputs: results/<data>/e2_explainers.csv, results/<data>/summary.json, figures/<data>/*.png
 """
 import argparse
 import json
 import subprocess
-import time
 
 import numpy as np
 import pandas as pd
 
 from tgn_trace.config import ROOT, TraceConfig
-from tgn_trace.explainers import bruteforce, greedy_cf, recency
 from tgn_trace.replay import Replayer
 from tgn_trace.state import get_env
 from tgn_trace.verify.run import pick_targets
@@ -45,24 +44,27 @@ def topk_metrics(ranked, bf_ranked, relevant, k):
                  f'r@{k}_vs_rel': hit_rel / len(relevant) if relevant else np.nan})
 
 
-def run_e2(env, replayer, targets, tau, methods):
+def run_e2(cfg, targets, tau):
+  """Explainers vs brute force, from the per-target verification JSONs (verify/run.py)."""
   rows = []
-  t0 = time.perf_counter()
-  for i, t in enumerate(targets):
-    bf = bruteforce.explain(env, t, replayer)
-    relevant = {e for e, d in bf['deltas'].items() if d <= -tau}  # removal lowers score by >= tau
-    for name, fn in methods.items():
-      ex = fn(env, t, replayer) if name != 'recency' else fn(env, t)
-      # For counterfactual methods, precision@k is computed on the explanation set they return
-      # (padded with their ranking of the rest), i.e. on `ranked`.
-      row = dict(target=t, method=name, status=ex['status'], n_candidates=len(bf['candidates']),
+  for t in targets:
+    path = cfg.results_dir / 'verification' / f'{t}.json'
+    if not path.exists():
+      continue
+    res = json.loads(path.read_text())
+    deltas = {int(e): d for e, d in res['bruteforce']['deltas'].items()}
+    bf_ranked = [int(e) for e in res['bruteforce']['ranked']]
+    relevant = {e for e, d in deltas.items() if d <= -tau}  # removal lowers score by >= tau
+    for name, ex in res['explainers'].items():
+      ranked = [int(e) for e in ex['ranked']]
+      extra = ex['extra']
+      row = dict(target=t, method=name, status=ex['status'], n_candidates=len(deltas),
                  n_relevant=len(relevant), runtime_ms=ex['runtime_ms'], n_model_evals=ex['n_model_evals'],
-                 cf_success=ex.get('success'), cf_size=len(ex['cf_set']) if 'cf_set' in ex else None,
-                 baseline_score=bf['baseline_score'])
+                 cf_success=extra.get('success'), cf_size=len(extra['cf_set']) if 'cf_set' in extra else None,
+                 cf_final_score=extra.get('final_score'), baseline_score=res['baseline_score'])
       for k in KS:
-        row.update(topk_metrics(ex['ranked'], bf['ranked'], relevant, k))
+        row.update(topk_metrics(ranked, bf_ranked, relevant, k))
       rows.append(row)
-    print(f'[{i + 1}/{len(targets)}] {t}  {time.perf_counter() - t0:.0f}s', flush=True)
   return pd.DataFrame(rows)
 
 
@@ -184,8 +186,6 @@ def figures(cfg, e2):
 def main():
   ap = argparse.ArgumentParser()
   ap.add_argument('--n_targets', type=int, default=100)
-  ap.add_argument('--no_cody', action='store_true')
-  ap.add_argument('--skip_e2', action='store_true', help='reuse results/<data>/e2_explainers.csv')
   args = ap.parse_args()
   cfg = TraceConfig()
   env = get_env(cfg)
@@ -193,16 +193,9 @@ def main():
   res = cfg.results_dir
   tau = json.loads((res / 'threshold_selection.json').read_text())['tau']
 
-  methods = {'recency': recency.explain, 'greedy': greedy_cf.explain}
-  if not args.no_cody:
-    from tgn_trace.explainers import cody_adapter
-    methods['cody'] = cody_adapter.explain
-  if args.skip_e2 and (res / 'e2_explainers.csv').exists():
-    e2 = pd.read_csv(res / 'e2_explainers.csv')
-  else:
-    targets = pick_targets(replayer, 'test', args.n_targets, seed=1)
-    e2 = run_e2(env, replayer, targets, tau, methods)
-    e2.to_csv(res / 'e2_explainers.csv', index=False)
+  targets = pick_targets(replayer, 'test', args.n_targets, seed=1)
+  e2 = run_e2(cfg, targets, tau)
+  e2.to_csv(res / 'e2_explainers.csv', index=False)
 
   summary = dict(config=cfg.to_dict(), git_hash=git_hash(), data=cfg.data)
   summary['E1_baseline'] = json.loads((res / 'baseline_metrics.json').read_text())

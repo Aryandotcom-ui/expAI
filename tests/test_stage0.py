@@ -72,3 +72,29 @@ def test_baseline_pass_repeatable(env, baseline_df):
   assert np.array_equal(df1.score.values, df2.score.values)
   assert np.allclose(df1.score.values, baseline_df.score.values, atol=1e-6, rtol=0)
   print('\nbaseline test AP/AUC (ours):', json.dumps({k: round(m1[k], 5) for k in m1 if k.startswith('test_')}))
+
+
+def test_fast_advance_matches_model_code_path(env):
+  """advance_state's fast path leaves exactly the state TGN.compute_temporal_embeddings leaves."""
+  if not env.fast_advance:
+    return
+  start = env.first_test_batch - 15
+  states = []
+  for fast in (True, False):
+    env._fast_ok = fast
+    env.reset_state()
+    for b in range(start):  # get to a realistic state quickly with the fast path
+      env._fast_ok = True
+      env.advance_state(env.batches[b], env.full_ngh_finder)
+    env._fast_ok = fast
+    for b in range(start, start + 15):
+      env.advance_state(env.batches[b], env.full_ngh_finder)
+    states.append(env.snapshot())
+  env._fast_ok = True
+  (m1, l1, msg1), (m2, l2, msg2) = states
+  assert torch.equal(m1, m2) and torch.equal(l1, l2)
+  keys = {k for k, v in msg1.items() if v} | {k for k, v in msg2.items() if v}
+  for k in keys:
+    assert len(msg1[k]) == len(msg2[k])
+    for (a, ta), (b, tb) in zip(msg1[k], msg2[k]):
+      assert torch.equal(a, b) and torch.equal(ta, tb)

@@ -41,13 +41,15 @@ def load_baseline_scores(env: TraceEnv):
 
 class Replayer:
   def __init__(self, env: TraceEnv, checkpoints: CheckpointStore = None, baseline_scores=None,
-               cache_size=4096):
+               cache_size=4096, prefix_size=40):
     self.env = env
     self.checkpoints = checkpoints if checkpoints is not None else CheckpointStore(env)
     self.baseline = baseline_scores if baseline_scores is not None else load_baseline_scores(env)
     self._cache = OrderedDict()
     self.cache_size = cache_size
     self.n_model_runs = 0
+    self._prefix, self._prefix_tb = {}, None
+    self.prefix_size = prefix_size
 
   # ------------------------------------------------------------------ helpers
   def _prepare(self, target_edge_idx, removed_edge_idxs):
@@ -94,8 +96,47 @@ class Replayer:
     self.n_model_runs += 1
     return self._result(target_edge_idx, removed, cf, replayed, t0, None)
 
-  def checkpointed_replay(self, target_edge_idx, removed_edge_idxs=(), use_cache=True):
-    """Restore the latest checkpoint at/before the earliest removed event's batch, replay forward."""
+  def _restore_start(self, b, use_prefix):
+    """Put the env in the BASELINE state at the start of batch b. Returns (start batch, source).
+
+    Without `use_prefix` this restores the latest disk checkpoint <= b and the caller replays from
+    there. With it, baseline states at every batch boundary in the current window are kept in RAM
+    (they are exact: before the earliest removed event nothing differs from the baseline), so
+    later removals near the same target replay only from their own batch.
+    """
+    ckpt = self.checkpoints.latest_at_or_before(b)
+    if not use_prefix:
+      self.checkpoints.restore(ckpt)
+      return ckpt, 'disk' if ckpt else 'reset'
+    have = [c for c in self._prefix if ckpt <= c <= b]
+    if have:
+      start = max(have)
+      self.env.restore(self._prefix[start])
+      source = 'ram'
+    else:
+      start = ckpt
+      self.checkpoints.restore(ckpt)
+      source = 'disk' if ckpt else 'reset'
+    for bb in range(start, b):
+      if len(self._prefix) < self.prefix_size and bb not in self._prefix:
+        self._prefix[bb] = self.env.snapshot()
+      self.env.advance_state(self.env.batches[bb], self.env.full_ngh_finder)
+    if b not in self._prefix and len(self._prefix) < self.prefix_size:
+      self._prefix[b] = self.env.snapshot()
+    return b, source
+
+  def _window(self, target_edge_idx):
+    """Prefix snapshots are only valid as baseline states; drop them when the target changes
+    batch so RAM use stays bounded."""
+    tb = int(self.env.batch_of[self.env.pos(target_edge_idx)])
+    if tb != self._prefix_tb:
+      self._prefix, self._prefix_tb = {}, tb
+
+  def checkpointed_replay(self, target_edge_idx, removed_edge_idxs=(), use_cache=True, use_prefix=True):
+    """Restore the latest saved state at/before the earliest removed event's batch, replay forward.
+
+    use_prefix=False uses disk checkpoints only (what the latency benchmark measures).
+    """
     key = (int(target_edge_idx), frozenset(int(e) for e in removed_edge_idxs))
     if use_cache and key in self._cache:
       self._cache.move_to_end(key)
@@ -107,12 +148,14 @@ class Replayer:
     tpos, removed, removed_pos, ngh = self._prepare(target_edge_idx, removed_edge_idxs)
     tb = int(env.batch_of[tpos])
     earliest = min((int(env.batch_of[p]) for p in removed_pos), default=tb)
-    ckpt = self.checkpoints.latest_at_or_before(min(earliest, tb))
-    self.checkpoints.restore(ckpt)
-    replayed = self._replay_batches(ckpt, tb, removed_pos, ngh)
+    if use_prefix:
+      self._window(target_edge_idx)
+    start, source = self._restore_start(min(earliest, tb), use_prefix)
+    replayed = self._replay_batches(start, tb, removed_pos, ngh)
     cf = score_target(env, target_edge_idx, ngh)
     self.n_model_runs += 1
-    res = self._result(target_edge_idx, removed, cf, replayed, t0, int(ckpt))
+    res = self._result(target_edge_idx, removed, cf, replayed, t0, int(start))
+    res['state_source'] = source
     res['cached'] = False
     if use_cache:
       self._cache[key] = dict(res)
@@ -129,7 +172,7 @@ class Replayer:
     tpos, removed, removed_pos, ngh = self._prepare(target_edge_idx, removed_edge_idxs)
     tb = int(env.batch_of[tpos])
     earliest = min((int(env.batch_of[p]) for p in removed_pos), default=tb)
-    ckpt = self.checkpoints.latest_at_or_before(min(earliest, tb))
-    self.checkpoints.restore(ckpt)
-    self._replay_batches(ckpt, tb, removed_pos, ngh)
+    self._window(target_edge_idx)
+    start, _ = self._restore_start(min(earliest, tb), use_prefix=True)
+    self._replay_batches(start, tb, removed_pos, ngh)
     return ngh

@@ -12,7 +12,9 @@ Outputs (results/<data>/):
   verification/<id>.json    everything for one target (served by the API)
   verification_null.npz     pooled null agreement samples per explainer (for the figure)
 
-Usage: python -m tgn_trace.verify.run [--n_test 60] [--n_val 20] [--no_c]
+Usage: python -m tgn_trace.verify.run [--n_test 100] [--n_val 20] [--no_c] [--with_cody]
+       Parallel: --stage tau, then --stage targets --shard k --n_shards n (one process per shard,
+       resumable), then --stage aggregate.
 """
 import argparse
 import json
@@ -80,7 +82,8 @@ def select_tau(replayer, n_val, seed, tau_floor, n_control=5):
   return tau, log
 
 
-def verify_target(replayer, target, tau, with_c=True, n_perm=1000, explainers=EXPLAINERS):
+def verify_target(replayer, target, tau, with_c=True, n_perm=1000, explainers=None):
+  explainers = explainers or EXPLAINERS
   env = replayer.env
   bf = bruteforce.explain(env, target, replayer)
   deltas = bf['deltas']
@@ -121,13 +124,47 @@ def verify_target(replayer, target, tau, with_c=True, n_perm=1000, explainers=EX
               explainers=per_expl, events=events), nulls
 
 
+def aggregate(cfg, targets):
+  """Build the CSVs and the pooled null from per-target JSONs."""
+  out = cfg.results_dir
+  rows, event_rows, pooled = [], [], {}
+  for t in targets:
+    path = out / 'verification' / f'{t}.json'
+    if not path.exists():
+      continue
+    res = json.loads(path.read_text())
+    deltas = {int(e): d for e, d in res['bruteforce']['deltas'].items()}
+    for name, ex in res['explainers'].items():
+      pooled.setdefault(name, []).append(np.asarray(ex.get('null', []), dtype=float))
+      rows.append(dict(target_id=t, explainer=name, baseline_score=res['baseline_score'],
+                       n_candidates=len(res['candidates']), agreement=ex['agreement'],
+                       null_percentile=ex['null_percentile'], flag=ex['flag'], reason=ex['reason'],
+                       status=ex['status'], n_model_evals=ex['n_model_evals'], runtime_ms=ex['runtime_ms'],
+                       cf_success=ex['extra'].get('success'),
+                       cf_size=len(ex['extra']['cf_set']) if 'cf_set' in ex['extra'] else None,
+                       top3=' '.join(map(str, ex['ranked'][:3])),
+                       top3_abs_delta=' '.join(f'{abs(deltas[int(e)]):.4f}' for e in ex['ranked'][:3]),
+                       max_abs_delta=max(abs(d) for d in deltas.values()), tau=res['tau']))
+    for ev in res['events']:
+      event_rows.append(dict(target_id=t, **ev))
+  pd.DataFrame(rows).to_csv(out / 'verification.csv', index=False)
+  pd.DataFrame(event_rows).to_csv(out / 'verification_events.csv', index=False)
+  np.savez(out / 'verification_null.npz', **{k: np.concatenate([x for x in v if len(x)]) if any(
+    len(x) for x in v) else np.array([]) for k, v in pooled.items()})
+  return pd.DataFrame(rows)
+
+
 def main():
   ap = argparse.ArgumentParser()
-  ap.add_argument('--n_test', type=int, default=60)
+  ap.add_argument('--n_test', type=int, default=100)
   ap.add_argument('--n_val', type=int, default=20)
   ap.add_argument('--tau_floor', type=float, default=1e-3)
   ap.add_argument('--no_c', action='store_true')
+  ap.add_argument('--with_cody', action='store_true')
   ap.add_argument('--seed', type=int, default=0)
+  ap.add_argument('--shard', type=int, default=0)
+  ap.add_argument('--n_shards', type=int, default=1)
+  ap.add_argument('--stage', choices=['all', 'tau', 'targets', 'aggregate'], default='all')
   args = ap.parse_args()
 
   cfg = TraceConfig()
@@ -135,36 +172,37 @@ def main():
   replayer = Replayer(env)
   out = cfg.results_dir
   (out / 'verification').mkdir(parents=True, exist_ok=True)
-
   t0 = time.perf_counter()
-  tau, log = select_tau(replayer, args.n_val, args.seed, args.tau_floor)
-  (out / 'threshold_selection.json').write_text(json.dumps(log, indent=2))
-  print(f'tau={tau:.5f} chosen on {log["n_val_targets"]} val targets ({time.perf_counter() - t0:.0f}s)')
+  tau_path = out / 'threshold_selection.json'
 
-  rows, event_rows, pooled = [], [], {k: [] for k in EXPLAINERS}
-  for i, t in enumerate(pick_targets(replayer, 'test', args.n_test, args.seed + 1)):
-    res, nulls = verify_target(replayer, t, tau, with_c=not args.no_c)
-    (out / 'verification' / f'{t}.json').write_text(json.dumps(res, default=float))
-    deltas = res['bruteforce']['deltas']
-    for name, ex in res['explainers'].items():
-      pooled[name].append(nulls[name])
-      rows.append(dict(target_id=t, explainer=name, baseline_score=res['baseline_score'],
-                       n_candidates=len(res['candidates']), agreement=ex['agreement'],
-                       null_percentile=ex['null_percentile'], flag=ex['flag'], reason=ex['reason'],
-                       top3=' '.join(map(str, ex['ranked'][:3])),
-                       top3_abs_delta=' '.join(f'{abs(deltas[e]):.4f}' for e in ex['ranked'][:3]),
-                       max_abs_delta=max(abs(d) for d in deltas.values()), tau=tau))
-    for ev in res['events']:
-      event_rows.append(dict(target_id=t, **ev))
-    print(f'[{i + 1}/{args.n_test}] target {t}: ' + ', '.join(
-      f'{n}={ex["flag"]}(rho={ex["agreement"]:.2f})' for n, ex in res['explainers'].items()) +
-      f'  {time.perf_counter() - t0:.0f}s', flush=True)
+  if args.stage in ('all', 'tau'):
+    tau, log = select_tau(replayer, args.n_val, args.seed, args.tau_floor)
+    tau_path.write_text(json.dumps(log, indent=2))
+    print(f'tau={tau:.5f} chosen on {log["n_val_targets"]} val targets ({time.perf_counter() - t0:.0f}s)')
+  targets = pick_targets(replayer, 'test', args.n_test, args.seed + 1)
 
-  pd.DataFrame(rows).to_csv(out / 'verification.csv', index=False)
-  pd.DataFrame(event_rows).to_csv(out / 'verification_events.csv', index=False)
-  np.savez(out / 'verification_null.npz', **{k: np.concatenate([x for x in v if len(x)]) if any(
-    len(x) for x in v) else np.array([]) for k, v in pooled.items()})
-  print(pd.DataFrame(rows).groupby(['explainer', 'flag']).size())
+  if args.stage in ('all', 'targets'):
+    tau = json.loads(tau_path.read_text())['tau']
+    explainers = dict(EXPLAINERS)
+    if args.with_cody:
+      from tgn_trace.explainers import cody_adapter
+      explainers['cody'] = cody_adapter.explain
+    mine = targets[args.shard::args.n_shards]
+    for i, t in enumerate(mine):
+      path = out / 'verification' / f'{t}.json'
+      if path.exists():
+        continue  # resumable
+      res, nulls = verify_target(replayer, t, tau, with_c=not args.no_c, explainers=explainers)
+      for name in res['explainers']:
+        res['explainers'][name]['null'] = [round(float(x), 4) for x in nulls[name]]
+      path.write_text(json.dumps(res, default=float))
+      print(f'[shard {args.shard}: {i + 1}/{len(mine)}] target {t}: ' + ', '.join(
+        f'{n}={ex["flag"]}(rho={ex["agreement"]:.2f})' for n, ex in res['explainers'].items()) +
+        f'  {time.perf_counter() - t0:.0f}s', flush=True)
+
+  if args.stage in ('all', 'aggregate'):
+    df = aggregate(cfg, targets)
+    print(df.groupby(['explainer', 'flag']).size())
 
 
 if __name__ == '__main__':
